@@ -77,6 +77,11 @@ public class ProductsController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> UpdateStock(int id, [FromBody] int quantity)
     {
+        if (quantity < 0)
+        {
+            return BadRequest("Stock quantity cannot be negative.");
+        }
+
         var result = await _productService.UpdateStockAsync(id, quantity);
         if (!result)
         {

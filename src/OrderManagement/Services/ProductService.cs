@@ -126,17 +126,7 @@ public class ProductService : IProductService
 
         InvalidateProductCache();
 
-        return new ProductDto
-        {
-            Id = product.Id,
-            Name = product.Name,
-            Description = product.Description,
-            Price = product.Price,
-            StockQuantity = product.StockQuantity,
-            Category = product.Category,
-            CreatedAt = product.CreatedAt,
-            UpdatedAt = product.UpdatedAt
-        };
+        return MapToDto(product);
     }
 
     public async Task<ProductDto?> UpdateProductAsync(int id, ProductUpdateDto productDto)
@@ -164,17 +154,7 @@ public class ProductService : IProductService
 
         InvalidateProductCache(id, product.Category);
 
-        return new ProductDto
-        {
-            Id = product.Id,
-            Name = product.Name,
-            Description = product.Description,
-            Price = product.Price,
-            StockQuantity = product.StockQuantity,
-            Category = product.Category,
-            CreatedAt = product.CreatedAt,
-            UpdatedAt = product.UpdatedAt
-        };
+        return MapToDto(product);
     }
 
     public async Task<bool> DeleteProductAsync(int id)
@@ -195,6 +175,11 @@ public class ProductService : IProductService
 
     public async Task<bool> UpdateStockAsync(int id, int quantity)
     {
+        if (quantity < 0)
+        {
+            return false;
+        }
+
         var product = await _context.Products.FindAsync(id);
         if (product == null)
         {
@@ -224,5 +209,20 @@ public class ProductService : IProductService
         {
             _cache.Remove($"{CategoryCacheKeyPrefix}{category}");
         }
+    }
+
+    private static ProductDto MapToDto(Product product)
+    {
+        return new ProductDto
+        {
+            Id = product.Id,
+            Name = product.Name,
+            Description = product.Description,
+            Price = product.Price,
+            StockQuantity = product.StockQuantity,
+            Category = product.Category,
+            CreatedAt = product.CreatedAt,
+            UpdatedAt = product.UpdatedAt
+        };
     }
 }

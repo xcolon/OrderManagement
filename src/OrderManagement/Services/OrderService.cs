@@ -11,6 +11,8 @@ public class OrderService : IOrderService
     private readonly ApplicationDbContext _context;
     private readonly IMemoryCache _cache;
     private const string UserOrdersCacheKeyPrefix = "UserOrders_";
+    private const string AllProductsCacheKey = "AllProducts";
+    private const string ProductCacheKeyPrefix = "Product_";
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(2);
 
     public OrderService(ApplicationDbContext context, IMemoryCache cache)
@@ -123,6 +125,7 @@ public class OrderService : IOrderService
             await transaction.CommitAsync();
 
             InvalidateUserOrderCache(userId);
+            InvalidateProductCache(productIds);
 
             return await GetOrderByIdAsync(order.Id);
         }
@@ -165,10 +168,15 @@ public class OrderService : IOrderService
             return false;
         }
 
+        // Load all products in a single query to avoid N+1 problem
+        var productIds = order.OrderItems.Select(i => i.ProductId).ToList();
+        var products = await _context.Products
+            .Where(p => productIds.Contains(p.Id))
+            .ToDictionaryAsync(p => p.Id);
+
         foreach (var item in order.OrderItems)
         {
-            var product = await _context.Products.FindAsync(item.ProductId);
-            if (product != null)
+            if (products.TryGetValue(item.ProductId, out var product))
             {
                 product.StockQuantity += item.Quantity;
             }
@@ -178,6 +186,7 @@ public class OrderService : IOrderService
         await _context.SaveChangesAsync();
 
         InvalidateUserOrderCache(order.UserId);
+        InvalidateProductCache(productIds);
 
         return true;
     }
@@ -185,6 +194,15 @@ public class OrderService : IOrderService
     private void InvalidateUserOrderCache(string userId)
     {
         _cache.Remove($"{UserOrdersCacheKeyPrefix}{userId}");
+    }
+
+    private void InvalidateProductCache(List<int> productIds)
+    {
+        _cache.Remove(AllProductsCacheKey);
+        foreach (var productId in productIds)
+        {
+            _cache.Remove($"{ProductCacheKeyPrefix}{productId}");
+        }
     }
 
     private static OrderDto MapToDto(Order order)
